@@ -1,0 +1,10 @@
+.git
+.github
+chart
+*.md
+LICENSE
+cog.toml
+cliff.toml
+sonar-project.properties
+.sync-manifest.yml
+.sync-ignore

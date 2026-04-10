@@ -1,0 +1,17 @@
+files:
+  # From template-base
+  - .github/workflows/stale-prs.yml
+  - .github/ISSUE_TEMPLATE/bug_report.yml
+  - .github/ISSUE_TEMPLATE/feature_request.yml
+  - .github/ISSUE_TEMPLATE/config.yml
+  - .github/pull_request_template.md
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - LICENSE
+  - cog.toml
+  - cliff.toml
+  # Docker-specific
+  - .github/workflows/ci.yml
+  - .github/workflows/release.yml
+  - .github/workflows/template-sync.yml
+  - .github/dependabot.yml
