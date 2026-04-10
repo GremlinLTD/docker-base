@@ -4,14 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "Dockerfile"
-      - "chart/**"
-      - "src/**"
+      - "*/Dockerfile"
+      - "entrypoint/**"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version override (e.g. 1.0.0). Leave empty for auto-increment from commit messages."
-        required: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -22,45 +17,81 @@ permissions:
   packages: write
 
 jobs:
-  version:
-    name: Bump version
+  build-push:
+    name: Push ${{ matrix.variant }}
     if: github.actor != 'gremlinltd-release-bot[bot]'
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.bump.outputs.version }}
+    strategy:
+      matrix:
+        include:
+          - variant: alpine
+            dockerfile: alpine/Dockerfile
+            tag_prefix: alpine
+          - variant: ubuntu
+            dockerfile: ubuntu/Dockerfile
+            tag_prefix: ubuntu
+          - variant: distroless-static
+            dockerfile: distroless-static/Dockerfile
+            tag_prefix: distroless-static
+          - variant: distroless-python
+            dockerfile: distroless-python/Dockerfile
+            tag_prefix: distroless-python
     steps:
-      - name: Generate app token
-        id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
-        with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v3
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
         with:
-          fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install cocogitto
+      - name: Extract version tags
+        id: tags
         run: |
-          curl -sSL https://github.com/cocogitto/cocogitto/releases/latest/download/cocogitto-7.0.0-x86_64-unknown-linux-musl.tar.gz | tar xz --strip-components=1 -C /usr/local/bin
+          FROM_LINE=$(head -1 ${{ matrix.dockerfile }})
+          case "${{ matrix.variant }}" in
+            alpine)
+              # FROM alpine:3 -> alpine-3 (rolling)
+              # Resolve actual version for pinned tag
+              VERSION=$(docker pull alpine:3 2>/dev/null | grep -oP 'alpine:3\.\d+' | head -1 | cut -d: -f2 || echo "3")
+              if [ -n "${VERSION}" ] && [ "${VERSION}" != "3" ]; then
+                MAJOR=$(echo "${VERSION}" | cut -d. -f1)
+                echo "tags=ghcr.io/gremlinltd/base:alpine-${MAJOR},ghcr.io/gremlinltd/base:alpine-${VERSION}" >> "$GITHUB_OUTPUT"
+              else
+                echo "tags=ghcr.io/gremlinltd/base:alpine-3" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            ubuntu)
+              # FROM ubuntu:24.04 -> ubuntu-24, ubuntu-24.04
+              VERSION=$(echo "${FROM_LINE}" | grep -oP '[\d]+\.[\d]+' | head -1)
+              MAJOR=$(echo "${VERSION}" | cut -d. -f1)
+              echo "tags=ghcr.io/gremlinltd/base:ubuntu-${MAJOR},ghcr.io/gremlinltd/base:ubuntu-${VERSION}" >> "$GITHUB_OUTPUT"
+              ;;
+            distroless-static)
+              echo "tags=ghcr.io/gremlinltd/base:distroless-static-13" >> "$GITHUB_OUTPUT"
+              ;;
+            distroless-python)
+              echo "tags=ghcr.io/gremlinltd/base:distroless-python-13" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          echo "Generated tags: $(cat "$GITHUB_OUTPUT")"
 
-      - name: Bump version
-        id: bump
-        run: |
-          git config --global user.name "gremlinltd-release-bot[bot]"
-          git config --global user.email "gremlinltd-release-bot[bot]@users.noreply.github.com"
-          cog bump ${{ github.event.inputs.version && format('--version {0}', github.event.inputs.version) || '--auto' }}
-          VERSION=$(git describe --tags --abbrev=0)
-          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Push tag
-        run: |
-          git push origin main --tags
+      - name: Build and push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198e362a7d2c83 # v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
 
   changelog:
     name: Generate changelog
-    needs: version
+    needs: build-push
     runs-on: ubuntu-latest
     steps:
       - name: Generate app token
@@ -73,7 +104,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          ref: main
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Generate changelog
@@ -91,92 +121,6 @@ jobs:
           git config user.email "gremlinltd-release-bot[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           if ! git diff --cached --quiet; then
-            git commit -m "docs: update changelog for v${{ needs.version.outputs.version }}"
+            git commit -m "docs: update changelog"
             git push origin main
           fi
-
-  build-push:
-    name: Build & push image
-    needs: version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: v${{ needs.version.outputs.version }}
-
-      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v3
-      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract repo name
-        id: repo
-        run: echo "name=${GITHUB_REPOSITORY##*/}" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198e362a7d2c83 # v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:v${{ needs.version.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
-
-  helm-publish:
-    name: Publish Helm chart
-    needs: version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: v${{ needs.version.outputs.version }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v4
-        with:
-          version: latest
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Update chart version
-        run: |
-          sed -i "s/^version:.*/version: ${{ needs.version.outputs.version }}/" chart/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ needs.version.outputs.version }}\"/" chart/Chart.yaml
-
-      - name: Package and push chart
-        run: |
-          CHART_NAME=$(grep '^name:' chart/Chart.yaml | awk '{print $2}')
-          helm package chart/
-          helm push ${CHART_NAME}-${{ needs.version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
-
-  release:
-    name: Create release
-    needs: [version, build-push, helm-publish, changelog]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-          ref: v${{ needs.version.outputs.version }}
-
-      - name: Generate release notes
-        uses: orhun/git-cliff-action@c93ef52f3d0ddcdcc9bd5447d98d458a11cd4f72 # v4
-        id: cliff
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
-        with:
-          tag_name: v${{ needs.version.outputs.version }}
-          body: ${{ steps.cliff.outputs.content }}
