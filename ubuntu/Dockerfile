@@ -3,6 +3,7 @@ FROM ubuntu:24.04
 LABEL org.opencontainers.image.source="https://github.com/gremlinltd/docker-base"
 LABEL org.opencontainers.image.description="Ubuntu base image with gizmo user"
 
+# hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tini gosu \
     && rm -rf /var/lib/apt/lists/* \
