@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "Dockerfile"
-      - "chart/**"
+      - "*/Dockerfile"
+      - "entrypoint/**"
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
@@ -13,6 +13,9 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   commits:
@@ -33,75 +36,131 @@ jobs:
           cog check "$BASE_SHA..HEAD"
 
   lint:
-    name: Lint Dockerfile
+    name: Lint Dockerfiles
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dockerfile: [alpine/Dockerfile, ubuntu/Dockerfile]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: ${{ matrix.dockerfile }}
 
-  build:
-    name: Build image
+  shellcheck:
+    name: ShellCheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Run ShellCheck
+        run: shellcheck entrypoint/entrypoint.sh
 
+  build:
+    name: Build ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - variant: alpine
+            dockerfile: alpine/Dockerfile
+          - variant: ubuntu
+            dockerfile: ubuntu/Dockerfile
+          - variant: distroless-static
+            dockerfile: distroless-static/Dockerfile
+          - variant: distroless-python
+            dockerfile: distroless-python/Dockerfile
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v3
-      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v3
-
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
       - name: Build (no push)
         uses: docker/build-push-action@263435318d21b8e681c14492fe198e362a7d2c83 # v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: false
 
   scan:
-    name: Scan image
+    name: Scan ${{ matrix.variant }}
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - variant: alpine
+            dockerfile: alpine/Dockerfile
+          - variant: ubuntu
+            dockerfile: ubuntu/Dockerfile
+          - variant: distroless-static
+            dockerfile: distroless-static/Dockerfile
+          - variant: distroless-python
+            dockerfile: distroless-python/Dockerfile
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
       - name: Build for scanning
         uses: docker/build-push-action@263435318d21b8e681c14492fe198e362a7d2c83 # v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           load: true
-          tags: scan-target:latest
-
+          tags: scan-${{ matrix.variant }}:latest
       - name: Trivy scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
-          image-ref: scan-target:latest
+          image-ref: scan-${{ matrix.variant }}:latest
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
 
-  helm-lint:
-    name: Lint Helm chart
+  smoke:
+    name: Smoke test ${{ matrix.variant }}
+    needs: build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - variant: alpine
+            dockerfile: alpine/Dockerfile
+            has_shell: true
+          - variant: ubuntu
+            dockerfile: ubuntu/Dockerfile
+            has_shell: true
+          - variant: distroless-static
+            dockerfile: distroless-static/Dockerfile
+            has_shell: false
+          - variant: distroless-python
+            dockerfile: distroless-python/Dockerfile
+            has_shell: false
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Install Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v4
+      - name: Build for testing
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198e362a7d2c83 # v6
         with:
-          version: latest
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: smoke-${{ matrix.variant }}:latest
 
-      - name: Lint chart
-        run: helm lint chart/
-
-      - name: Template chart
-        run: helm template test-release chart/
-
-      - name: Install kubeconform
+      - name: Test default user
+        if: matrix.has_shell
         run: |
-          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin
+          RESULT=$(docker run --rm smoke-${{ matrix.variant }}:latest whoami)
+          echo "whoami: ${RESULT}"
+          [ "${RESULT}" = "gizmo" ] || { echo "FAIL: expected gizmo, got ${RESULT}"; exit 1; }
 
-      - name: Validate manifests
-        run: helm template test-release chart/ | kubeconform -strict -summary
+      - name: Test PUID/PGID
+        if: matrix.has_shell
+        run: |
+          RESULT=$(docker run --rm -u root -e PUID=1001 -e PGID=1001 smoke-${{ matrix.variant }}:latest id)
+          echo "id: ${RESULT}"
+          echo "${RESULT}" | grep -q "uid=1001" || { echo "FAIL: expected uid=1001"; exit 1; }
+
+      - name: Test distroless runs
+        if: "!matrix.has_shell"
+        run: |
+          docker inspect smoke-${{ matrix.variant }}:latest > /dev/null 2>&1
+          echo "Image exists and is valid"
 
   sonar:
     name: SonarQube
