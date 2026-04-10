@@ -1,32 +1,39 @@
-# Project name
+# docker-base
 
-> Replace this with your project description.
+Minimal base container images for GremlinLTD projects.
 
-## Run
+## Variants
+
+| Variant           | Base                                         | Tags                        | User                  | Size  |
+| ----------------- | -------------------------------------------- | --------------------------- | --------------------- | ----- |
+| alpine            | `alpine:3`                                   | `alpine-3`, `alpine-3.23`   | `gizmo` (UID 1000)    | ~7MB  |
+| ubuntu            | `ubuntu:24.04`                               | `ubuntu-24`, `ubuntu-24.04` | `gizmo` (UID 1000)    | ~28MB |
+| distroless-static | `gcr.io/distroless/static-debian13:nonroot`  | `distroless-static-13`      | `nonroot` (UID 65534) | ~3MB  |
+| distroless-python | `gcr.io/distroless/python3-debian13:nonroot` | `distroless-python-13`      | `nonroot` (UID 65534) | ~50MB |
+
+All images are at `ghcr.io/gremlinltd/base`.
+
+## Usage
 
 ```sh
-docker run ghcr.io/gremlinltd/REPO_NAME:latest
+docker run ghcr.io/gremlinltd/base:alpine-3 whoami
+# gizmo
 ```
 
-## Helm
+## PUID/PGID (alpine and ubuntu only)
+
+Match container user to your host UID/GID for volume permissions:
 
 ```sh
-helm install my-release oci://ghcr.io/gremlinltd/charts/REPO_NAME
+docker run -u root -e PUID=1000 -e PGID=1000 -v ./data:/app/data ghcr.io/gremlinltd/base:alpine-3 ls -la /app/data
 ```
 
-## Development
+The container starts as root, adjusts the `gizmo` user's UID/GID, then drops privileges. If `PUID`/`PGID` are not set, the container runs as `gizmo` (UID 1000) directly.
 
-```sh
-git clone https://github.com/gremlinltd/REPO_NAME.git
-cd REPO_NAME
-docker build -t REPO_NAME .
-docker run REPO_NAME
-```
+## Distroless variants
 
-## After creating a repo from this template
+No shell, no package manager, no PUID/PGID support. Use `nonroot` (UID 65534). For compiled static binaries (Go, Rust with `--target x86_64-unknown-linux-musl`) use `distroless-static`. For Python apps use `distroless-python`.
 
-1. Replace `REPO_NAME` in `chart/Chart.yaml`, `chart/values.yaml`, `cog.toml`, `cliff.toml`, `sonar-project.properties`, `CONTRIBUTING.md`, and this README
-2. Set up SonarCloud project and add `SONAR_TOKEN` as a repo secret
-3. Update the Dockerfile with your actual application
-4. Update `chart/values.yaml` with appropriate defaults
-5. Update this README with actual project docs
+## License
+
+MIT

@@ -8,10 +8,10 @@
 
 ## How to test
 
-- [ ] `docker build .`
-- [ ] `helm lint chart/`
-- [ ] `helm template test chart/`
-- [ ] Tested manually
+- [ ] `docker build -f alpine/Dockerfile .`
+- [ ] `docker build -f ubuntu/Dockerfile .`
+- [ ] `shellcheck entrypoint/entrypoint.sh`
+- [ ] Tested manually with `docker run`
 
 ## Commit type
 

@@ -1,0 +1,5 @@
+.github/workflows/ci.yml
+.github/workflows/release.yml
+.github/dependabot.yml
+Dockerfile
+.dockerignore

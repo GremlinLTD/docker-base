@@ -4,7 +4,7 @@ header = """
 """
 body = """
 {%- macro remote_url() -%}
-  https://github.com/gremlinltd/REPO_NAME
+  https://github.com/gremlinltd/docker-base
 {%- endmacro -%}
 
 {% if version -%}
@@ -53,4 +53,4 @@ sort_commits = "newest"
 
 [remote.github]
 owner = "gremlinltd"
-repo = "REPO_NAME"
+repo = "docker-base"
