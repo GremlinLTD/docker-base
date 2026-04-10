@@ -2,7 +2,7 @@ version: 2
 
 updates:
   - package-ecosystem: docker
-    directory: "/"
+    directory: "/alpine"
     schedule:
       interval: weekly
       day: monday
@@ -10,7 +10,36 @@ updates:
       prefix: "chore(deps):"
     labels:
       - "dependencies"
-    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: "/ubuntu"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: docker
+    directory: "/distroless-static"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: docker
+    directory: "/distroless-python"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps):"
+    labels:
+      - "dependencies"
 
   - package-ecosystem: github-actions
     directory: "/"
