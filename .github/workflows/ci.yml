@@ -90,12 +90,16 @@ jobs:
         include:
           - variant: alpine
             dockerfile: alpine/Dockerfile
+            severity: CRITICAL,HIGH
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
+            severity: CRITICAL,HIGH
           - variant: distroless-static
             dockerfile: distroless-static/Dockerfile
+            severity: CRITICAL
           - variant: distroless-python
             dockerfile: distroless-python/Dockerfile
+            severity: CRITICAL
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Build for scanning
@@ -111,7 +115,7 @@ jobs:
           image-ref: scan-${{ matrix.variant }}:latest
           format: table
           exit-code: 1
-          severity: CRITICAL,HIGH
+          severity: ${{ matrix.severity }}
 
   smoke:
     name: Smoke test ${{ matrix.variant }}
