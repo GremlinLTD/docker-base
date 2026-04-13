@@ -7,6 +7,7 @@ Minimal base container images for GremlinLTD projects.
 | Variant           | Base                                         | Tags                        | User                  | Size  |
 | ----------------- | -------------------------------------------- | --------------------------- | --------------------- | ----- |
 | alpine            | `alpine:3`                                   | `alpine-3`, `alpine-3.23`   | `gizmo` (UID 1000)    | ~7MB  |
+| wolfi             | `cgr.dev/chainguard/wolfi-base:latest`       | `wolfi`                     | `gizmo` (UID 1000)    | ~12MB |
 | ubuntu            | `ubuntu:24.04`                               | `ubuntu-24`, `ubuntu-24.04` | `gizmo` (UID 1000)    | ~28MB |
 | distroless-static | `gcr.io/distroless/static-debian13:nonroot`  | `distroless-static-13`      | `nonroot` (UID 65534) | ~3MB  |
 | distroless-python | `gcr.io/distroless/python3-debian13:nonroot` | `distroless-python-13`      | `nonroot` (UID 65534) | ~50MB |
@@ -20,7 +21,7 @@ docker run ghcr.io/gremlinltd/base:alpine-3 whoami
 # gizmo
 ```
 
-## PUID/PGID (alpine and ubuntu only)
+## PUID/PGID (alpine, wolfi, ubuntu)
 
 Match container user to your host UID/GID for volume permissions:
 

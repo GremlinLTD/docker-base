@@ -22,6 +22,7 @@ jobs:
     if: github.actor != 'gremlinltd-release-bot[bot]'
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - variant: alpine
@@ -30,6 +31,9 @@ jobs:
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
             tag_prefix: ubuntu
+          - variant: wolfi
+            dockerfile: wolfi/Dockerfile
+            tag_prefix: wolfi
           - variant: distroless-static
             dockerfile: distroless-static/Dockerfile
             tag_prefix: distroless-static
@@ -70,6 +74,10 @@ jobs:
               VERSION=$(echo "${FROM_LINE}" | grep -oP '[\d]+\.[\d]+' | head -1)
               MAJOR=$(echo "${VERSION}" | cut -d. -f1)
               echo "tags=ghcr.io/gremlinltd/base:ubuntu-${MAJOR},ghcr.io/gremlinltd/base:ubuntu-${VERSION}" >> "$GITHUB_OUTPUT"
+              ;;
+            wolfi)
+              # Wolfi is rolling release, single tag
+              echo "tags=ghcr.io/gremlinltd/base:wolfi" >> "$GITHUB_OUTPUT"
               ;;
             distroless-static)
               echo "tags=ghcr.io/gremlinltd/base:distroless-static-13" >> "$GITHUB_OUTPUT"

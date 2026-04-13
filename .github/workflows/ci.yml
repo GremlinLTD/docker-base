@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dockerfile: [alpine/Dockerfile, ubuntu/Dockerfile]
+        dockerfile: [alpine/Dockerfile, ubuntu/Dockerfile, wolfi/Dockerfile]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
@@ -59,12 +59,15 @@ jobs:
     name: Build ${{ matrix.variant }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - variant: alpine
             dockerfile: alpine/Dockerfile
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
+          - variant: wolfi
+            dockerfile: wolfi/Dockerfile
           - variant: distroless-static
             dockerfile: distroless-static/Dockerfile
           - variant: distroless-python
@@ -95,6 +98,9 @@ jobs:
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
             severity: CRITICAL,HIGH
+          - variant: wolfi
+            dockerfile: wolfi/Dockerfile
+            severity: CRITICAL,HIGH
           - variant: distroless-static
             dockerfile: distroless-static/Dockerfile
             severity: CRITICAL
@@ -123,6 +129,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - variant: alpine
@@ -130,6 +137,9 @@ jobs:
             has_shell: true
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
+            has_shell: true
+          - variant: wolfi
+            dockerfile: wolfi/Dockerfile
             has_shell: true
           - variant: distroless-static
             dockerfile: distroless-static/Dockerfile
