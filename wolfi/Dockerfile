@@ -1,3 +1,4 @@
+# hadolint ignore=DL3007
 FROM cgr.dev/chainguard/wolfi-base:latest
 
 LABEL org.opencontainers.image.source="https://github.com/gremlinltd/docker-base"
