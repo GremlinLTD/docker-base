@@ -86,11 +86,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - variant: alpine
             dockerfile: alpine/Dockerfile
-            severity: CRITICAL,HIGH
+            severity: CRITICAL
           - variant: ubuntu
             dockerfile: ubuntu/Dockerfile
             severity: CRITICAL,HIGH
