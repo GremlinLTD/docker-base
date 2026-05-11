@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 LABEL org.opencontainers.image.source="https://github.com/gremlinltd/docker-base"
 LABEL org.opencontainers.image.description="Ubuntu base image with gizmo user"
