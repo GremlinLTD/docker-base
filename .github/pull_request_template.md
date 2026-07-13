@@ -8,10 +8,8 @@
 
 ## How to test
 
-- [ ] `docker build -f alpine/Dockerfile .`
-- [ ] `docker build -f ubuntu/Dockerfile .`
-- [ ] `shellcheck entrypoint/entrypoint.sh`
-- [ ] Tested manually with `docker run`
+- [ ] Tests pass
+- [ ] Tested manually
 
 ## Commit type
 
